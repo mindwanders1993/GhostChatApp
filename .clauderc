@@ -1,0 +1,37 @@
+{
+  "project_name": "GhostChatApp",
+  "description": "Anonymous chat application with React/TypeScript frontend, FastAPI backend, and PostgreSQL database",
+  "development_commands": {
+    "frontend": {
+      "install": "cd frontend && npm install",
+      "dev": "cd frontend && npm start",
+      "build": "cd frontend && npm run build",
+      "test": "cd frontend && npm test",
+      "lint": "cd frontend && npm run lint"
+    },
+    "backend": {
+      "install": "cd backend && pip install -r requirements.txt",
+      "dev": "cd backend && uvicorn main:app --reload",
+      "test": "cd backend && pytest",
+      "lint": "cd backend && python -m flake8"
+    },
+    "docker": {
+      "up": "docker-compose up --build",
+      "down": "docker-compose down",
+      "logs": "docker-compose logs"
+    }
+  },
+  "test_command": "cd backend && pytest && cd ../frontend && npm test",
+  "build_command": "docker-compose -f docker-compose.prod.yml up --build",
+  "main_directories": ["frontend", "backend", "scripts"],
+  "ignore_patterns": [
+    "node_modules",
+    "__pycache__",
+    "*.pyc",
+    ".env",
+    "build",
+    "dist",
+    ".pytest_cache",
+    "coverage"
+  ]
+}
