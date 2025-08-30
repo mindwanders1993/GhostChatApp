@@ -20,6 +20,7 @@ import {
   Menu,
   MenuItem,
   Divider,
+  TextField,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -27,6 +28,7 @@ import {
   MoreVert,
   Close,
   ExitToApp,
+  Send,
 } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { useSocket } from '../../hooks/useSocket';
@@ -94,6 +96,7 @@ const WhatsAppStyleChat: React.FC = () => {
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [userNicknames, setUserNicknames] = useState<{[key: string]: string}>({});
   const [editingMessage, setEditingMessage] = useState<{id: string; content: string; formatting?: MessageFormatting} | null>(null);
+  const [newMessage, setNewMessage] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -192,19 +195,12 @@ const WhatsAppStyleChat: React.FC = () => {
         
         const messageToAdd = {
           id: message.id || Date.now().toString(),
-          room_id: message.room_id || '',
+          room_id: message.room_id || currentRoomId,
           sender_id: message.sender_id || '',
-          sender_nickname: message.sender_nickname || '',
+          sender_nickname: message.sender_nickname || 'Anonymous', // Important!
           content: messageContent,
-          message_type: (message.message_type as 'text' | 'image' | 'file' | 'emoji' | 'url' | 'audio') || 'text',
-          formatting: message.formatting,
+          message_type: (message.message_type as 'text' | 'image' | 'file' | 'emoji' | 'url' | 'audio' | 'whisper' | 'deleted') || 'text',
           sent_at: message.timestamp || new Date().toISOString(),
-          is_whisper: message.is_whisper || false,
-          whisper_to_id: message.whisper_to_id,
-          whisper_to_nickname: message.whisper_to_nickname,
-          reply_to_id: message.reply_to_id,
-          mentioned_users: message.mentioned_users || [],
-          status: 'delivered'
         };
         
         dispatch(addMessage(messageToAdd));
@@ -504,29 +500,35 @@ const WhatsAppStyleChat: React.FC = () => {
     const senderColor = generateUserColor(message.sender_id);
     
     return (
-      <EnhancedMessageBubble
-        key={message.id}
-        message={message}
-        isOwn={isOwn}
-        isSystem={isSystem}
-        showName={showName}
-        showDate={showDate}
-        isLastInGroup={isLastInGroup}
-        senderName={senderName}
-        senderColor={senderColor}
-        currentUserId={user?.id || ''}
-        isMobile={isMobile}
-        onEdit={handleStartEdit}
-        onDelete={handleDeleteMessage}
-        onCopy={(content) => {
-          navigator.clipboard.writeText(content);
-          dispatch(showSuccess('Message copied!'));
-        }}
-        onReaction={(messageId, emoji) => {
-          // TODO: Implement reaction functionality
-          dispatch(showInfo(`Reacted with ${emoji}`));
-        }}
-      />
+      <Box key={message.id}>
+        {!isOwn && !isSystem && (
+          <Typography variant="caption" sx={{ color: 'text.secondary', mb: 0.5 }}>
+            {message.sender_nickname || `User ${message.sender_id.substring(0, 8)}`}
+          </Typography>
+        )}
+        <EnhancedMessageBubble
+          message={message}
+          isOwn={isOwn}
+          isSystem={isSystem}
+          showName={showName}
+          showDate={showDate}
+          isLastInGroup={isLastInGroup}
+          senderName={senderName}
+          senderColor={senderColor}
+          currentUserId={user?.id || ''}
+          isMobile={isMobile}
+          onEdit={handleStartEdit}
+          onDelete={handleDeleteMessage}
+          onCopy={(content) => {
+            navigator.clipboard.writeText(content);
+            dispatch(showSuccess('Message copied!'));
+          }}
+          onReaction={(messageId, emoji) => {
+            // TODO: Implement reaction functionality
+            dispatch(showInfo(`Reacted with ${emoji}`));
+          }}
+        />
+      </Box>
     );
   };
 
@@ -679,26 +681,35 @@ const WhatsAppStyleChat: React.FC = () => {
         <div ref={messagesEndRef} />
       </Box>
 
-      {/* Rich Text Composer */}
-      <Box
-        sx={{
-          p: isMobile ? 1 : 2,
-          bgcolor: '#f0f0f0',
-          borderTop: '1px solid rgba(0,0,0,0.1)',
-        }}
-      >
-        <RichTextComposer
-          onSendMessage={handleSendMessage}
-          onEditMessage={handleEditMessage}
-          onDeleteMessage={handleDeleteMessage}
-          onStartTyping={handleStartTyping}
-          onStopTyping={handleStopTyping}
-          editingMessage={editingMessage}
-          onCancelEdit={handleCancelEdit}
-          placeholder="Type a message..."
-          disabled={!isConnected}
-          maxLength={2000}
-        />
+      {/* Message Input */}
+      <Box sx={{ p: 2, bgcolor: 'white', borderTop: '1px solid #e0e0e0' }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Type a message..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage(newMessage);
+                setNewMessage('');
+              }
+            }}
+            size="small"
+          />
+          <IconButton 
+            color="primary"
+            onClick={() => {
+              handleSendMessage(newMessage);
+              setNewMessage('');
+            }}
+            disabled={!newMessage.trim()}
+          >
+            <Send />
+          </IconButton>
+        </Box>
       </Box>
 
       {/* Online Users Drawer */}

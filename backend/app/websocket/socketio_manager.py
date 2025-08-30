@@ -8,6 +8,8 @@ from app.services.chat_service import ChatService
 from app.services.moderation_service import moderation_service
 from app.middleware.rate_limit import websocket_rate_limiter
 from app.database import get_db
+from app.models.user import User
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +162,16 @@ class SocketIOManager:
                     }, room=sid)
                     return {'error': 'Content moderation blocked message'}
                 
+                # Get user info and include nickname
+                user_nickname = 'Anonymous'
+                async for db in get_db():
+                    user = await db.execute(
+                        select(User).where(User.id == user_id)
+                    )
+                    user_data = user.scalar_one_or_none()
+                    user_nickname = user_data.nickname if user_data else 'Anonymous'
+                    break
+                
                 # Create and broadcast message
                 formatting = data.get('formatting')
                 # Support for encrypted messages
@@ -171,7 +183,8 @@ class SocketIOManager:
                     user_id, room_id, content, message_type, formatting,
                     is_encrypted=is_encrypted,
                     encryption_iv=encryption_iv,
-                    encryption_key_id=encryption_key_id
+                    encryption_key_id=encryption_key_id,
+                    user_nickname=user_nickname
                 )
                 
                 return {
@@ -437,7 +450,7 @@ class SocketIOManager:
             logger.error(f"Error leaving room {room_id} for user {user_id}: {str(e)}")
     
     async def _broadcast_message(self, user_id: str, room_id: str, content: str, message_type: str, formatting: dict = None,
-                               is_encrypted: bool = False, encryption_iv: str = None, encryption_key_id: str = None) -> str:
+                               is_encrypted: bool = False, encryption_iv: str = None, encryption_key_id: str = None, user_nickname: str = 'Anonymous') -> str:
         """Create and broadcast message to room"""
         try:
             # Save message to database
@@ -452,7 +465,7 @@ class SocketIOManager:
                         'id': str(message.id),
                         'room_id': room_id,
                         'sender_id': user_id,
-                        'sender_nickname': message.sender.nickname if message.sender else None,
+                        'sender_nickname': user_nickname,
                         'content': content,
                         'message_type': message_type,
                         'formatting': formatting,
@@ -477,6 +490,7 @@ class SocketIOManager:
                         'id': message_id,
                         'room_id': room_id,
                         'sender_id': user_id,
+                        'sender_nickname': user_nickname,
                         'content': content,
                         'message_type': message_type,
                         'formatting': formatting,
