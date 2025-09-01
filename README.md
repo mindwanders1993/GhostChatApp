@@ -1,141 +1,169 @@
-# GhostChatApp - Anonymous Chat Application
+# Ultra-Ephemeral Anonymous Chat MVP
 
-A secure, anonymous chat application built with React, FastAPI, and PostgreSQL. Designed for privacy-first communication with comprehensive moderation and safety features.
+A privacy-focused anonymous chat application with aggressive data destruction, built according to the ephemeral chat bible specifications.
 
-## Features
+## 🔒 Privacy Features
 
-- **Anonymous Communication**: No personal information required
-- **Real-time Messaging**: WebSocket-powered instant messaging
-- **Smart Matching**: Interest-based user pairing
-- **Content Moderation**: AI-powered safety features
-- **Privacy Protection**: End-to-end encryption and temporary storage
-- **Mobile Responsive**: Progressive Web App (PWA) support
+- **15-minute sessions** - Your identity self-destructs automatically
+- **24-hour messages** - All conversations vanish completely  
+- **No personal data** - Zero email, phone, or tracking required
+- **Anonymous by design** - Cryptographically secure temporary IDs
+- **Instant self-destruct** - Users can destroy all data immediately
+- **Redis-only storage** - No persistent database, automatic TTL
 
-## Tech Stack
-
-### Frontend
-- React 18.2+ with TypeScript
-- Material-UI (MUI) v5
-- Redux Toolkit + RTK Query
-- Socket.io-client
-- Vite build tool
+## 🚀 Tech Stack
 
 ### Backend
-- FastAPI 0.104+
-- Python 3.11+
-- PostgreSQL 15+
-- Redis 7+
-- Socket.io for WebSocket
+- **Framework**: FastAPI with native WebSocket support
+- **Storage**: Redis 7+ (ONLY - no persistent database)
+- **Language**: Python 3.11+
+- **Real-time**: Native WebSocket connections
+
+### Frontend
+- **Framework**: React 18+ with TypeScript
+- **State Management**: Zustand (lightweight)
+- **Styling**: Tailwind CSS
+- **Build Tool**: Create React App
 
 ### Infrastructure
-- Docker & Docker Compose
-- Nginx (production)
-- Prometheus & Grafana (monitoring)
+- **Containerization**: Docker & Docker Compose
+- **Development**: Hot reload for both frontend/backend
+- **Production**: Optimized multi-stage builds
 
 ## Quick Start
 
-### Prerequisites
-- Docker and Docker Compose
-- Node.js 18+ (for local development)
-- Python 3.11+ (for local development)
+### Development
 
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd GhostChatApp
-```
-
-2. Start with Docker Compose:
-```bash
+# Start all services
 docker-compose up --build
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# Redis: localhost:6379
 ```
 
-3. Access the application:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
+### Production
 
-### Local Development
-
-#### Backend Setup
 ```bash
+# Deploy to production
+docker-compose -f docker-compose.prod.yml up --build -d
+```
+
+## 🏗️ Architecture
+
+- **Backend**: FastAPI with WebSocket support, Redis-only storage
+- **Frontend**: React 18+ with TypeScript, Zustand state management, Tailwind CSS
+- **Real-time**: Native WebSocket connections with auto-reconnection
+- **Security**: Proof-of-work anti-spam, session-based authentication
+- **Data**: All data expires automatically, no persistent storage
+
+## 📁 Project Structure
+
+```
+├── backend/                 # FastAPI backend
+│   ├── main.py             # Application entry point
+│   ├── ghost_identity.py   # Anonymous identity management
+│   ├── redis_manager.py    # Redis operations with TTL
+│   ├── websocket_manager.py # WebSocket connection handling
+│   ├── destruction_engine.py # Data destruction engine
+│   ├── proof_of_work.py    # Anti-spam system
+│   └── requirements.txt    # Python dependencies
+├── frontend/               # React TypeScript frontend
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── hooks/          # Custom hooks (WebSocket)
+│   │   ├── pages/          # Landing and Chat pages
+│   │   ├── store/          # Zustand state management
+│   │   ├── types/          # TypeScript definitions
+│   │   └── App.tsx         # Main application
+│   └── package.json        # Node.js dependencies
+├── docker-compose.yml      # Development environment
+├── docker-compose.prod.yml # Production environment
+└── ephemeral-chat-bible.md # Original specification
+```
+
+## 🔧 API Endpoints
+
+- `POST /api/ghost` - Create anonymous ghost identity
+- `POST /api/ghost/{ghost_id}/destroy` - Destroy ghost completely
+- `GET /api/stats` - Get platform statistics
+- `GET /api/health` - Health check
+- `WS /ws/{ghost_id}` - WebSocket connection
+
+## 📱 WebSocket Events
+
+**Client → Server:**
+- `join_room` - Join a chat room
+- `leave_room` - Leave a chat room  
+- `send_message` - Send message to room
+- `create_room` - Create new room
+- `typing` - Send typing indicator
+
+**Server → Client:**
+- `room_joined` - Room join confirmation
+- `new_message` - New message in room
+- `ghost_joined/left` - User join/leave notifications
+- `typing_indicator` - Typing status updates
+
+## ⚡ Key Features Implemented
+
+✅ **Ghost Identity System** - Cryptographically secure anonymous IDs  
+✅ **Redis TTL Management** - All data auto-expires  
+✅ **WebSocket Real-time** - Instant messaging with auto-reconnection  
+✅ **Data Destruction** - Complete user data elimination  
+✅ **Proof-of-Work** - SHA-256 based anti-spam system  
+✅ **Session Management** - 15-minute automatic logout  
+✅ **Room System** - Dynamic chat room creation/joining  
+✅ **UI Components** - Ghost identity, destruction timer, self-destruct button  
+✅ **Docker Environment** - Full containerization for dev/prod  
+
+## 🛡️ Security Measures
+
+- No persistent database (Redis-only with TTL)
+- Automatic session expiration (15 minutes)
+- Message auto-deletion (24 hours maximum)
+- Anonymous identity generation
+- Proof-of-work challenge system
+- Client-side anti-screenshot protection
+- Complete data destruction on demand
+
+## 🚨 Privacy Warnings
+
+- This is an experimental platform designed for maximum privacy
+- All data is automatically destroyed - there is no recovery
+- While built for anonymity, never share sensitive personal information
+- Client-side protections can be bypassed by determined actors
+
+## 📋 Pending Tasks
+
+The following features are outlined in the ephemeral chat bible but not yet implemented:
+
+- Comprehensive test suite
+- Advanced content moderation
+- Mobile PWA optimization  
+- End-to-end encryption
+- Onion routing integration
+- Behavioral thermodynamics (heat/entropy system)
+
+## 🔬 Development Commands
+
+```bash
+# Backend
 cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+uvicorn main:app --reload
 
-#### Frontend Setup
-```bash
+# Frontend  
 cd frontend
 npm install
 npm start
+
+# Redis
+docker run -p 6379:6379 redis:7-alpine
 ```
 
-## Project Structure
+---
 
-```
-GhostChatApp/
-├── backend/                 # FastAPI backend
-│   ├── app/
-│   │   ├── models/         # Database models
-│   │   ├── routers/        # API routes
-│   │   ├── services/       # Business logic
-│   │   ├── websocket/      # WebSocket handling
-│   │   └── utils/          # Utilities
-│   ├── tests/              # Backend tests
-│   └── requirements.txt
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── hooks/          # Custom hooks
-│   │   ├── store/          # Redux store
-│   │   ├── types/          # TypeScript types
-│   │   └── utils/          # Utilities
-│   └── package.json
-├── docker-compose.yml      # Docker configuration
-└── README.md
-```
-
-## API Documentation
-
-The API documentation is available at `/docs` when the backend is running. Key endpoints include:
-
-- `POST /api/v1/auth/register` - Anonymous user registration
-- `POST /api/v1/matching/find` - Find chat partner
-- `GET /api/v1/chat/rooms/{id}` - Get chat room details
-- `POST /api/v1/moderation/reports` - Report user/content
-
-## Security Features
-
-- **Anonymous Authentication**: JWT tokens with no PII
-- **Content Moderation**: Multi-layer filtering system
-- **Rate Limiting**: API and WebSocket protection
-- **Input Validation**: Comprehensive sanitization
-- **Privacy Protection**: Temporary data storage only
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes and add tests
-4. Run the test suite: `npm test` and `pytest`
-5. Submit a pull request
-
-## Deployment
-
-For production deployment, see the deployment documentation in `/docs/deployment.md`.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support and questions:
-- Create an issue on GitHub
-- Check the documentation in `/docs`
-- Review the API documentation at `/docs` endpoint
+**⚠️ Remember**: This platform proves that meaningful digital communication can exist without surveillance capitalism. Every interaction reinforces user sovereignty and radical privacy.

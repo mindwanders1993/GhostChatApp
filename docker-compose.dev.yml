@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   redis:
     image: redis:7-alpine
@@ -46,8 +48,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_WS_URL=ws://backend:8000
-      - VITE_API_URL=http://backend:8000
+      - VITE_WS_URL=ws://localhost:8000
+      - VITE_API_URL=http://localhost:8000
     depends_on:
       - backend
     command: npm run dev -- --host
