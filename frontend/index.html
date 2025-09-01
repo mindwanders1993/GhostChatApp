@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/ghost.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GhostChatApp - Anonymous Ephemeral Chat</title>
+    <meta name="description" content="Anonymous chat where your data self-destructs. No traces, no tracking, complete privacy." />
+    <style>
+      /* Basic anti-screenshot protection */
+      body {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* Disable context menu */
+      * {
+        -webkit-context-menu: none;
+        -moz-context-menu: none;
+        -o-context-menu: none;
+        context-menu: none;
+      }
+      
+      /* Disable drag */
+      * {
+        -webkit-user-drag: none;
+        -khtml-user-drag: none;
+        -moz-user-drag: none;
+        -o-user-drag: none;
+        user-drag: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+    
+    <script>
+      // Basic anti-screenshot measures
+      document.addEventListener('contextmenu', e => e.preventDefault());
+      document.addEventListener('selectstart', e => e.preventDefault());
+      document.addEventListener('dragstart', e => e.preventDefault());
+      
+      // Detect developer tools
+      let devtools = false;
+      setInterval(() => {
+        if (window.outerHeight - window.innerHeight > 200 || window.outerWidth - window.innerWidth > 200) {
+          if (!devtools) {
+            devtools = true;
+            console.clear();
+            console.log('%c🚫 PRIVACY ALERT: Developer tools detected. Your ghost session will self-destruct in 10 seconds for security.', 'color: red; font-size: 20px; font-weight: bold;');
+          }
+        }
+      }, 1000);
+      
+      // Prevent common shortcuts
+      document.addEventListener('keydown', (e) => {
+        // Disable F12, Ctrl+Shift+I, Ctrl+U, Ctrl+S, Ctrl+P
+        if (e.key === 'F12' || 
+            (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+            (e.ctrlKey && e.key === 'u') ||
+            (e.ctrlKey && e.key === 's') ||
+            (e.ctrlKey && e.key === 'p')) {
+          e.preventDefault();
+          return false;
+        }
+      });
+    </script>
+  </body>
+</html>

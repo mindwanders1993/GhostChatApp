@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <div id="log"></div>
+    
+    <script>
+        const log = document.getElementById('log');
+        function addLog(message) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toISOString() + ': ' + message;
+            log.appendChild(div);
+            console.log(message);
+        }
+        
+        // Test WebSocket connection
+        const wsUrl = 'ws://localhost:8000/ws/test_ghost_123';
+        addLog('Attempting to connect to: ' + wsUrl);
+        
+        const ws = new WebSocket(wsUrl);
+        
+        ws.onopen = function() {
+            addLog('WebSocket connected successfully!');
+            ws.close();
+        };
+        
+        ws.onerror = function(error) {
+            addLog('WebSocket error: ' + error);
+        };
+        
+        ws.onclose = function(event) {
+            addLog('WebSocket closed. Code: ' + event.code + ', Reason: ' + event.reason);
+        };
+        
+        ws.onmessage = function(event) {
+            addLog('Received message: ' + event.data);
+        };
+    </script>
+</body>
+</html>
