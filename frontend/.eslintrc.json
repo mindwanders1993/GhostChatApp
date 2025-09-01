@@ -1,0 +1,20 @@
+{
+  "root": true,
+  "env": { "browser": true, "es2020": true, "node": true },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "ignorePatterns": ["dist", ".eslintrc.json", "src/**/*.test.ts", "src/**/*.test.tsx", "src/__tests__/**/*", "src/test/**/*", "vite.config.ts"],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["react-refresh"],
+  "globals": {
+    "NodeJS": "readonly"
+  },
+  "rules": {
+    "react-refresh/only-export-components": [
+      "warn",
+      { "allowConstantExport": true }
+    ],
+    "no-unused-vars": "off"
+  }
+}
