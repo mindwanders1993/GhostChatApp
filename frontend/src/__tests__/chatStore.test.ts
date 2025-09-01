@@ -1,18 +1,18 @@
 import { renderHook, act } from '@testing-library/react';
 import { useChatStore } from '../store/chatStore';
-import { Room, Message } from '../types';
+import { Room, Message, RoomMember } from '../types';
 
 describe('Chat Store', () => {
   beforeEach(() => {
     // Reset store state before each test
     const store = useChatStore.getState();
-    store.reset();
+    store.destroy();
   });
 
   test('should initialize with default state', () => {
     const { result } = renderHook(() => useChatStore());
 
-    expect(result.current.connected).toBe(false);
+    expect(result.current.isConnected).toBe(false);
     expect(result.current.rooms).toEqual([]);
     expect(result.current.messages).toEqual({});
     expect(result.current.connectedUsers).toEqual({});
@@ -28,7 +28,7 @@ describe('Chat Store', () => {
       result.current.setConnected(true);
     });
 
-    expect(result.current.connected).toBe(true);
+    expect(result.current.isConnected).toBe(true);
   });
 
   test('should set connection error', () => {
@@ -115,24 +115,31 @@ describe('Chat Store', () => {
 
   test('should add connected user to room', () => {
     const { result } = renderHook(() => useChatStore());
+    const user: RoomMember = {
+      ghost_id: 'ghost1',
+      display_name: 'Ghost 1',
+      avatar_color: '#ff0000'
+    };
 
     act(() => {
-      result.current.addConnectedUser('room1', 'ghost1');
+      result.current.addConnectedUser('room1', user);
     });
 
-    expect(result.current.connectedUsers['room1']).toContain('ghost1');
+    expect(result.current.connectedUsers['room1']).toContainEqual(user);
   });
 
   test('should remove connected user from room', () => {
     const { result } = renderHook(() => useChatStore());
+    const user1: RoomMember = { ghost_id: 'ghost1', display_name: 'Ghost 1', avatar_color: '#ff0000' };
+    const user2: RoomMember = { ghost_id: 'ghost2', display_name: 'Ghost 2', avatar_color: '#00ff00' };
 
     act(() => {
-      result.current.setConnectedUsers('room1', ['ghost1', 'ghost2']);
+      result.current.setConnectedUsers('room1', [user1, user2]);
       result.current.removeConnectedUser('room1', 'ghost1');
     });
 
-    expect(result.current.connectedUsers['room1']).not.toContain('ghost1');
-    expect(result.current.connectedUsers['room1']).toContain('ghost2');
+    expect(result.current.connectedUsers['room1']).not.toContainEqual(user1);
+    expect(result.current.connectedUsers['room1']).toContainEqual(user2);
   });
 
   test('should add typing user', () => {
@@ -186,10 +193,10 @@ describe('Chat Store', () => {
 
     // Reset
     act(() => {
-      result.current.reset();
+      result.current.destroy();
     });
 
-    expect(result.current.connected).toBe(false);
+    expect(result.current.isConnected).toBe(false);
     expect(result.current.rooms).toEqual([]);
   });
 });

@@ -36,8 +36,21 @@ export const Chat: React.FC = () => {
   const [rightSidebarView, setRightSidebarView] = useState<'users' | 'private'>('users');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const processedRoomRef = useRef<string | null>(null);
 
   const webSocket = useWebSocket(ghost);
+
+  // Define handleJoinRoom early so it can be used in useEffect
+  const handleJoinRoom = useCallback((roomId: string) => {
+    if (currentRoom === roomId) return;
+    
+    if (currentRoom) {
+      webSocket.leaveRoom(currentRoom);
+    }
+    
+    webSocket.joinRoom(roomId);
+    setCurrentRoom(roomId);
+  }, [currentRoom, webSocket.leaveRoom, webSocket.joinRoom, setCurrentRoom]);
 
   // Redirect if no ghost identity
   useEffect(() => {
@@ -59,12 +72,13 @@ export const Chat: React.FC = () => {
   //   }
   // }, [isConnected]); // Remove webSocket from dependencies to prevent infinite loop
 
-  // Auto-join room from URL parameter
+  // Auto-join room from URL parameter - using ref to prevent loops
   useEffect(() => {
-    if (isConnected && roomParam && roomParam !== currentRoom) {
+    if (isConnected && roomParam && roomParam !== processedRoomRef.current) {
+      processedRoomRef.current = roomParam;
       handleJoinRoom(roomParam);
     }
-  }, [isConnected, roomParam, currentRoom, handleJoinRoom]);
+  }, [isConnected, roomParam, handleJoinRoom]); // Include handleJoinRoom
 
   // Fetch user's message count when room changes
   useEffect(() => {
@@ -131,16 +145,6 @@ export const Chat: React.FC = () => {
     }, 500);
   };
 
-  const handleJoinRoom = useCallback((roomId: string) => {
-    if (currentRoom === roomId) return;
-    
-    if (currentRoom) {
-      webSocket.leaveRoom(currentRoom);
-    }
-    
-    webSocket.joinRoom(roomId);
-    setCurrentRoom(roomId);
-  }, [currentRoom, webSocket, setCurrentRoom]);
 
   const handleCreateRoom = () => {
     if (!newRoomName.trim()) return;
@@ -208,7 +212,15 @@ export const Chat: React.FC = () => {
   };
 
   if (!ghost) {
-    return null;
+    return (
+      <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-pulse">👻</div>
+          <div className="text-white text-xl">Loading ghost identity...</div>
+          <div className="text-gray-400 text-sm mt-2">Please wait...</div>
+        </div>
+      </div>
+    );
   }
 
   const currentRoomMessages = currentRoom ? messages[currentRoom] || [] : [];

@@ -108,7 +108,7 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
     }
     
     // Prevent duplicate connections
-    if (ws.current?.readyState === WebSocket.CONNECTING || ws.current?.readyState === WebSocket.OPEN) {
+    if (ws.current && (ws.current.readyState === WebSocket.CONNECTING || ws.current.readyState === WebSocket.OPEN)) {
       console.log('WebSocket: Already connecting/connected, skipping. State:', ws.current.readyState);
       return;
     }
@@ -135,7 +135,7 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
         
         // Start heartbeat
         heartbeatInterval.current = setInterval(() => {
-          if (ws.current?.readyState === WebSocket.OPEN) {
+          if (ws.current && ws.current.readyState === WebSocket.OPEN) {
             ws.current.send(JSON.stringify({ type: 'ping' }));
           }
         }, 30000);
@@ -217,7 +217,7 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
   }, [setConnected]);
 
   const sendMessage = useCallback((message: any) => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(message));
       return true;
     }
@@ -258,18 +258,13 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
 
   // Connection management
   useEffect(() => {
-    console.log('WebSocket useEffect: Connection management running, ghost:', ghost?.ghost_id);
-    
     if (ghost) {
-      console.log('WebSocket useEffect: Ghost exists, calling connect()');
       connect();
     } else {
-      console.log('WebSocket useEffect: No ghost, calling disconnect()');
       disconnect();
     }
     
     return () => {
-      console.log('WebSocket useEffect: Cleanup - calling disconnect()');
       disconnect();
     };
   }, [ghost]); // Remove connect and disconnect from dependencies to prevent infinite loops

@@ -8,7 +8,6 @@ import { DestructionTimer } from '../components/DestructionTimer';
 import { Room } from '../types';
 
 export const Rooms: React.FC = () => {
-  console.log('Rooms component: Starting render');
   
   const navigate = useNavigate();
   const { 
@@ -26,15 +25,11 @@ export const Rooms: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const hasRequestedRooms = useRef(false);
 
-  console.log('Rooms component: State loaded, ghost=', ghost);
   
   const webSocket = useWebSocket(ghost);
 
   // Handle ghost identity loading and redirect
   useEffect(() => {
-    console.log('Rooms component - ghost:', ghost);
-    console.log('Rooms component - isConnected:', isConnected);
-    console.log('Rooms component - rooms:', rooms);
     
     // Set loading to false after initial render
     const initialTimeout = setTimeout(() => {
@@ -44,7 +39,6 @@ export const Rooms: React.FC = () => {
     // Only redirect if we're certain there's no ghost after giving time for state to initialize
     if (!ghost) {
       const redirectTimeout = setTimeout(() => {
-        console.log('No ghost found after timeout, redirecting to landing page');
         navigate('/');
       }, 2000); // Give more time for state initialization
       
@@ -61,7 +55,6 @@ export const Rooms: React.FC = () => {
   useEffect(() => {
     if (isConnected && !hasRequestedRooms.current) {
       hasRequestedRooms.current = true;
-      console.log('Calling listRooms() once for Rooms page');
       webSocket.listRooms();
     }
   }, [isConnected]); // Fixed: removed webSocket from dependencies and use ref to prevent spam
@@ -136,7 +129,6 @@ export const Rooms: React.FC = () => {
   };
 
   if (!ghost && isLoading) {
-    console.log('Rendering loading state - no ghost yet');
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -149,7 +141,6 @@ export const Rooms: React.FC = () => {
   }
 
   if (!ghost && !isLoading) {
-    console.log('No ghost found and not loading, should redirect soon');
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -161,7 +152,6 @@ export const Rooms: React.FC = () => {
     );
   }
 
-  console.log('Rooms: About to render main component with ghost:', ghost);
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -180,7 +170,7 @@ export const Rooms: React.FC = () => {
             >
               ← Back to Chat
             </button>
-            <GhostIdentity ghost={ghost} size="small" />
+            {ghost && <GhostIdentity ghost={ghost} size="small" />}
             <DestructionTimer
               initialTimeLeft={ghost?.session_ttl || 900}
               onExpire={handleSelfDestruct}

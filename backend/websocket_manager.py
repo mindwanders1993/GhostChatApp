@@ -147,6 +147,10 @@ class WebSocketManager:
             await self._send_error(ghost_id, "Room ID is required")
             return
 
+        # Ensure ghost_rooms entry exists
+        if ghost_id not in self.ghost_rooms:
+            self.ghost_rooms[ghost_id] = set()
+            
         # Leave all other rooms first to ensure clean room switching
         current_rooms = self.ghost_rooms.get(ghost_id, set()).copy()
         for current_room_id in current_rooms:
