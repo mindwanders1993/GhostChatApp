@@ -98,6 +98,14 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
         );
         break;
 
+      case 'message_status_update':
+        // Handle real-time message status updates
+        useChatStore.getState().updateMessageStatus(
+          message.message_id,
+          message.status
+        );
+        break;
+
       default:
         console.log('Unknown message type:', message.type);
     }
@@ -275,6 +283,14 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
     });
   }, [sendMessage]);
 
+  const markMessageAsRead = useCallback((messageId: string, roomId: string) => {
+    return sendMessage({
+      type: 'mark_read',
+      message_id: messageId,
+      room_id: roomId
+    });
+  }, [sendMessage]);
+
   // Auto-destruction on component unmount
   useEffect(() => {
     return () => {
@@ -306,6 +322,7 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
     listRooms,
     sendTyping,
     addReaction,
-    removeReaction
+    removeReaction,
+    markMessageAsRead
   };
 };

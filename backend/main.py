@@ -318,6 +318,29 @@ async def get_message_reactions(message_id: str):
         "reactions": reactions
     }
 
+@app.get("/api/message/{message_id}/status")
+async def get_message_status(message_id: str, room_id: str):
+    """Get status information for a specific message"""
+    status = await redis_manager.get_message_status(message_id, room_id)
+    if not status:
+        return {"error": "Message not found"}
+    
+    return {
+        "message_id": message_id,
+        "room_id": room_id,
+        "status": status
+    }
+
+@app.get("/api/ghost/{ghost_id}/last-seen")
+async def get_user_last_seen(ghost_id: str, room_id: str = None):
+    """Get user's last seen timestamp"""
+    last_seen = await redis_manager.get_user_last_seen(ghost_id, room_id)
+    return {
+        "ghost_id": ghost_id,
+        "room_id": room_id,
+        "last_seen": last_seen
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

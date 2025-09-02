@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useChatStore } from '../store/chatStore';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useReadReceipts } from '../hooks/useReadReceipts';
 import { GhostIdentity } from '../components/GhostIdentity';
 import { DestructionTimer } from '../components/DestructionTimer';
 import { SelfDestructButton } from '../components/SelfDestructButton';
@@ -11,6 +12,8 @@ import { MessageReactions } from '../components/MessageReactions';
 import { ReactionPicker } from '../components/ReactionPicker';
 import { SmartRichTextInput } from '../components/SmartRichTextInput';
 import { MarkdownRenderer } from '../components/MarkdownRenderer';
+import { MessageStatusIndicator } from '../components/MessageStatusIndicator';
+import { LastSeenIndicator } from '../components/LastSeenIndicator';
 import { Message, Room } from '../types';
 
 export const Chat: React.FC = () => {
@@ -44,6 +47,11 @@ export const Chat: React.FC = () => {
   const processedRoomRef = useRef<string | null>(null);
 
   const webSocket = useWebSocket(ghost);
+  const { observeMessage } = useReadReceipts({
+    markMessageAsRead: webSocket.markMessageAsRead,
+    currentRoom,
+    currentUserId: ghost?.ghost_id || ''
+  });
 
   // Define handleJoinRoom early so it can be used in useEffect
   const handleJoinRoom = useCallback((roomId: string) => {
@@ -458,6 +466,13 @@ export const Chat: React.FC = () => {
                     <div
                       key={message.id}
                       className={`flex mb-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
+                      ref={(el) => {
+                        if (el) {
+                          el.dataset.messageId = message.id;
+                          el.dataset.senderId = message.sender;
+                          observeMessage(el);
+                        }
+                      }}
                     >
                       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
                         {showSender && (
@@ -478,12 +493,15 @@ export const Chat: React.FC = () => {
                           >
                             <MarkdownRenderer content={message.content} />
                             <div className={`
-                              text-xs mt-1 
+                              text-xs mt-1 flex items-center justify-end space-x-1
                               ${isOwn ? 'text-blue-100' : 'text-gray-400'}
-                              float-right ml-2
                             `}>
-                              {formatMessageTime(message.timestamp)}
-                              {isOwn && <span className="ml-1">✓</span>}
+                              <span>{formatMessageTime(message.timestamp)}</span>
+                              <MessageStatusIndicator
+                                status={message.status}
+                                currentUserId={ghost.ghost_id}
+                                isOwnMessage={isOwn}
+                              />
                             </div>
                             <div className="clear-both"></div>
                             
@@ -616,6 +634,7 @@ export const Chat: React.FC = () => {
                 userId={user.ghost_id}
                 displayName={user.ghost_id === ghost.ghost_id ? 'You' : user.display_name}
                 isCurrentUser={user.ghost_id === ghost.ghost_id}
+                currentRoomId={currentRoom}
                 onMessageUser={() => {
                   // Refresh private rooms after creating a new one
                   setTimeout(() => {
