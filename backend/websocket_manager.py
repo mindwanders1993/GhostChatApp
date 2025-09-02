@@ -131,6 +131,10 @@ class WebSocketManager:
                 await self._handle_ping(ghost_id)
             elif message_type == "typing":
                 await self._handle_typing(ghost_id, data)
+            elif message_type == "add_reaction":
+                await self._handle_add_reaction(ghost_id, data)
+            elif message_type == "remove_reaction":
+                await self._handle_remove_reaction(ghost_id, data)
             else:
                 logger.warning(f"Unknown message type: {message_type}")
                 
@@ -366,3 +370,71 @@ class WebSocketManager:
         
         for ghost_id in list(self.active_connections.keys()):
             await self._send_personal_message(ghost_id, stats_message)
+
+    async def _handle_add_reaction(self, ghost_id: str, data: Dict):
+        """Handle adding a reaction to a message"""
+        message_id = data.get("message_id")
+        emoji = data.get("emoji")
+        room_id = data.get("room_id")
+        
+        if not message_id or not emoji or not room_id:
+            await self._send_error(ghost_id, "message_id, emoji, and room_id are required")
+            return
+        
+        # Verify user is in the room
+        if room_id not in self.ghost_rooms.get(ghost_id, set()):
+            await self._send_error(ghost_id, "You are not in this room")
+            return
+        
+        try:
+            reactions = await self.redis_manager.add_message_reaction(message_id, ghost_id, emoji)
+            
+            # Broadcast reaction update to all room members
+            await self._broadcast_to_room(room_id, {
+                "type": "message_reaction",
+                "message_id": message_id,
+                "action": "add",
+                "emoji": emoji,
+                "ghost_id": ghost_id,
+                "reactions": reactions
+            })
+            
+            logger.info(f"Ghost {ghost_id} added reaction {emoji} to message {message_id}")
+            
+        except Exception as e:
+            logger.error(f"Error adding reaction: {e}")
+            await self._send_error(ghost_id, "Failed to add reaction")
+
+    async def _handle_remove_reaction(self, ghost_id: str, data: Dict):
+        """Handle removing a reaction from a message"""
+        message_id = data.get("message_id")
+        emoji = data.get("emoji")
+        room_id = data.get("room_id")
+        
+        if not message_id or not emoji or not room_id:
+            await self._send_error(ghost_id, "message_id, emoji, and room_id are required")
+            return
+        
+        # Verify user is in the room
+        if room_id not in self.ghost_rooms.get(ghost_id, set()):
+            await self._send_error(ghost_id, "You are not in this room")
+            return
+        
+        try:
+            reactions = await self.redis_manager.remove_message_reaction(message_id, ghost_id, emoji)
+            
+            # Broadcast reaction update to all room members
+            await self._broadcast_to_room(room_id, {
+                "type": "message_reaction",
+                "message_id": message_id,
+                "action": "remove",
+                "emoji": emoji,
+                "ghost_id": ghost_id,
+                "reactions": reactions
+            })
+            
+            logger.info(f"Ghost {ghost_id} removed reaction {emoji} from message {message_id}")
+            
+        except Exception as e:
+            logger.error(f"Error removing reaction: {e}")
+            await self._send_error(ghost_id, "Failed to remove reaction")

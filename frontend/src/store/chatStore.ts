@@ -31,6 +31,9 @@ interface ChatStore extends ChatState {
   stats: AppStats;
   setStats: (stats: AppStats) => void;
   
+  // Reactions
+  updateMessageReaction: (messageId: string, reactions: any) => void;
+  
   // Destruction
   destroy: () => void;
 }
@@ -207,6 +210,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     };
   }),
   
+  // Reaction actions
+  updateMessageReaction: (messageId, reactions) => set((state) => {
+    const newMessages = { ...state.messages };
+    
+    // Find and update the message with reactions across all rooms
+    Object.keys(newMessages).forEach(roomId => {
+      newMessages[roomId] = newMessages[roomId].map(message => 
+        message.id === messageId 
+          ? { ...message, reactions }
+          : message
+      );
+    });
+    
+    return { messages: newMessages };
+  }),
+
   // Stats actions
   setStats: (stats) => set({ stats }),
   

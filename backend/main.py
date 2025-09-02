@@ -266,6 +266,58 @@ async def get_user_private_rooms(ghost_id: str):
         "count": len(private_rooms)
     }
 
+# Message Reaction Endpoints
+@app.post("/api/message/{message_id}/reaction")
+async def add_message_reaction(message_id: str, reaction_data: dict):
+    """Add a reaction to a message"""
+    ghost_id = reaction_data.get("ghost_id")
+    emoji = reaction_data.get("emoji")
+    
+    if not ghost_id or not emoji:
+        return {"error": "ghost_id and emoji are required"}, 400
+    
+    # Verify ghost session exists
+    session = await redis_manager.get_ghost_session(ghost_id)
+    if not session:
+        return {"error": "Invalid ghost session"}, 401
+    
+    reactions = await redis_manager.add_message_reaction(message_id, ghost_id, emoji)
+    return {
+        "message_id": message_id,
+        "reactions": reactions,
+        "success": True
+    }
+
+@app.delete("/api/message/{message_id}/reaction")
+async def remove_message_reaction(message_id: str, reaction_data: dict):
+    """Remove a reaction from a message"""
+    ghost_id = reaction_data.get("ghost_id")
+    emoji = reaction_data.get("emoji")
+    
+    if not ghost_id or not emoji:
+        return {"error": "ghost_id and emoji are required"}, 400
+    
+    # Verify ghost session exists
+    session = await redis_manager.get_ghost_session(ghost_id)
+    if not session:
+        return {"error": "Invalid ghost session"}, 401
+    
+    reactions = await redis_manager.remove_message_reaction(message_id, ghost_id, emoji)
+    return {
+        "message_id": message_id,
+        "reactions": reactions,
+        "success": True
+    }
+
+@app.get("/api/message/{message_id}/reactions")
+async def get_message_reactions(message_id: str):
+    """Get all reactions for a message"""
+    reactions = await redis_manager.get_message_reactions(message_id)
+    return {
+        "message_id": message_id,
+        "reactions": reactions
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

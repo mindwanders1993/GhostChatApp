@@ -90,6 +90,14 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
         // Pong response to our ping
         break;
 
+      case 'message_reaction':
+        // Handle reaction updates
+        useChatStore.getState().updateMessageReaction(
+          message.message_id,
+          message.reactions
+        );
+        break;
+
       default:
         console.log('Unknown message type:', message.type);
     }
@@ -249,6 +257,24 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
     return sendMessage({ type: 'typing', room_id: roomId, is_typing: isTyping });
   }, [sendMessage]);
 
+  const addReaction = useCallback((messageId: string, emoji: string, roomId: string) => {
+    return sendMessage({ 
+      type: 'add_reaction', 
+      message_id: messageId, 
+      emoji, 
+      room_id: roomId 
+    });
+  }, [sendMessage]);
+
+  const removeReaction = useCallback((messageId: string, emoji: string, roomId: string) => {
+    return sendMessage({ 
+      type: 'remove_reaction', 
+      message_id: messageId, 
+      emoji, 
+      room_id: roomId 
+    });
+  }, [sendMessage]);
+
   // Auto-destruction on component unmount
   useEffect(() => {
     return () => {
@@ -278,6 +304,8 @@ export const useWebSocket = (ghost: GhostIdentity | undefined) => {
     sendChatMessage,
     createRoom,
     listRooms,
-    sendTyping
+    sendTyping,
+    addReaction,
+    removeReaction
   };
 };
