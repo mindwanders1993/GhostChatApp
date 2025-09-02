@@ -90,7 +90,13 @@ class RedisManager:
             "sender": ghost_id,
             "content": content,
             "room_id": room_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": {
+                "sent": True,
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "delivered": {},  # {ghost_id: delivered_at}
+                "read": {}        # {ghost_id: read_at}
+            }
         }
         
         message_key = f"messages:{room_id}:{message_id}"
@@ -517,3 +523,136 @@ class RedisManager:
                     break  # User has reacted to this message
         
         return user_reacted_messages
+
+    # Message Status Methods
+    async def mark_message_delivered(self, message_id: str, room_id: str, ghost_id: str) -> bool:
+        """Mark a message as delivered to a specific user"""
+        message_key = f"messages:{room_id}:{message_id}"
+        message_data_str = await self.redis.get(message_key)
+        
+        if not message_data_str:
+            return False
+            
+        message_data = json.loads(message_data_str)
+        
+        # Don't mark as delivered for sender
+        if message_data.get('sender') == ghost_id:
+            return False
+            
+        # Update delivered status
+        if 'status' not in message_data:
+            message_data['status'] = {
+                'sent': True,
+                'sent_at': message_data.get('timestamp'),
+                'delivered': {},
+                'read': {}
+            }
+        
+        message_data['status']['delivered'][ghost_id] = datetime.now(timezone.utc).isoformat()
+        
+        # Save updated message
+        await self.redis.setex(
+            message_key,
+            self.MESSAGE_TTL,
+            json.dumps(message_data)
+        )
+        
+        logger.info(f"Message {message_id} marked as delivered to {ghost_id}")
+        return True
+
+    async def mark_message_read(self, message_id: str, room_id: str, ghost_id: str) -> bool:
+        """Mark a message as read by a specific user"""
+        message_key = f"messages:{room_id}:{message_id}"
+        message_data_str = await self.redis.get(message_key)
+        
+        if not message_data_str:
+            return False
+            
+        message_data = json.loads(message_data_str)
+        
+        # Don't mark as read for sender
+        if message_data.get('sender') == ghost_id:
+            return False
+            
+        # Update read status
+        if 'status' not in message_data:
+            message_data['status'] = {
+                'sent': True,
+                'sent_at': message_data.get('timestamp'),
+                'delivered': {},
+                'read': {}
+            }
+        
+        # Mark as delivered if not already (read implies delivered)
+        if ghost_id not in message_data['status']['delivered']:
+            message_data['status']['delivered'][ghost_id] = datetime.now(timezone.utc).isoformat()
+        
+        message_data['status']['read'][ghost_id] = datetime.now(timezone.utc).isoformat()
+        
+        # Save updated message
+        await self.redis.setex(
+            message_key,
+            self.MESSAGE_TTL,
+            json.dumps(message_data)
+        )
+        
+        logger.info(f"Message {message_id} marked as read by {ghost_id}")
+        return True
+
+    async def get_message_status(self, message_id: str, room_id: str) -> Optional[Dict]:
+        """Get status information for a specific message"""
+        message_key = f"messages:{room_id}:{message_id}"
+        message_data_str = await self.redis.get(message_key)
+        
+        if not message_data_str:
+            return None
+            
+        message_data = json.loads(message_data_str)
+        return message_data.get('status', {
+            'sent': True,
+            'sent_at': message_data.get('timestamp'),
+            'delivered': {},
+            'read': {}
+        })
+
+    async def update_user_last_seen(self, ghost_id: str, room_id: str = None) -> None:
+        """Update user's last seen timestamp"""
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        # Update global last seen
+        await self.redis.setex(
+            f"last_seen:{ghost_id}",
+            self.SESSION_TTL * 2,  # Keep for 30 minutes
+            timestamp
+        )
+        
+        # Update room-specific last seen if room provided
+        if room_id:
+            await self.redis.setex(
+                f"last_seen:{ghost_id}:{room_id}",
+                self.SESSION_TTL * 2,
+                timestamp
+            )
+
+    async def get_user_last_seen(self, ghost_id: str, room_id: str = None) -> Optional[str]:
+        """Get user's last seen timestamp"""
+        if room_id:
+            # Try room-specific first
+            last_seen = await self.redis.get(f"last_seen:{ghost_id}:{room_id}")
+            if last_seen:
+                return last_seen
+        
+        # Fall back to global last seen
+        return await self.redis.get(f"last_seen:{ghost_id}")
+
+    async def mark_room_messages_delivered(self, room_id: str, ghost_id: str, limit: int = 50) -> int:
+        """Mark recent messages in a room as delivered for a user"""
+        message_keys = await self.redis.lrange(f"room_messages:{room_id}", 0, limit - 1)
+        delivered_count = 0
+        
+        for message_key in message_keys:
+            message_id = message_key.split(':')[-1]
+            if await self.mark_message_delivered(message_id, room_id, ghost_id):
+                delivered_count += 1
+        
+        return delivered_count

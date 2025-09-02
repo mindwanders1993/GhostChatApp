@@ -269,7 +269,7 @@ export const MARKDOWN_HELP = RICH_TEXT_HELP;
  */
 export function autoLinkUrls(text: string): string {
   // URL regex pattern
-  const urlRegex = /(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*))/g;
+  const urlRegex = /(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*))/g;
   
   return text.replace(urlRegex, (url) => {
     const sanitized = sanitizeUrl(url);

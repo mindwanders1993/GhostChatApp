@@ -22,6 +22,13 @@ export interface MessageReaction {
   displayNames: string[];
 }
 
+export interface MessageStatus {
+  sent: boolean;
+  sent_at: string;
+  delivered: { [ghost_id: string]: string };
+  read: { [ghost_id: string]: string };
+}
+
 export interface Message {
   id: string;
   sender: string;
@@ -30,6 +37,7 @@ export interface Message {
   room_id: string;
   timestamp: string;
   reactions?: { [emoji: string]: MessageReaction };
+  status?: MessageStatus;
 }
 
 export interface Room {
@@ -49,7 +57,8 @@ export interface Room {
 export interface WebSocketMessage {
   type: 'connection_established' | 'room_joined' | 'room_left' | 'new_message' | 
         'ghost_joined' | 'ghost_left' | 'room_created' | 'room_list' | 'error' |
-        'heartbeat' | 'pong' | 'typing_indicator' | 'stats_update' | 'message_reaction';
+        'heartbeat' | 'pong' | 'typing_indicator' | 'stats_update' | 'message_reaction' |
+        'message_status_update';
   [key: string]: any;
 }
 

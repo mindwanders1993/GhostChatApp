@@ -1,19 +1,22 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore } from '../store/chatStore';
+import { LastSeenIndicator } from './LastSeenIndicator';
 
 interface UserCardProps {
   userId: string;
   displayName?: string;
   isCurrentUser?: boolean;
   onMessageUser?: () => void;
+  currentRoomId?: string;
 }
 
 export const UserCard: React.FC<UserCardProps> = ({
   userId,
   displayName,
   isCurrentUser = false,
-  onMessageUser
+  onMessageUser,
+  currentRoomId
 }) => {
   const navigate = useNavigate();
   const { ghost } = useChatStore();
@@ -85,10 +88,14 @@ export const UserCard: React.FC<UserCardProps> = ({
           <div className="text-sm text-white font-medium">
             {isCurrentUser ? 'You' : displayName || `Ghost#${userId.slice(-4)}`}
           </div>
-          {!isCurrentUser && (
-            <div className="text-xs text-gray-400">
-              Ghost#{userId.slice(-4)}
-            </div>
+          {!isCurrentUser ? (
+            <LastSeenIndicator 
+              ghostId={userId} 
+              roomId={currentRoomId}
+              className="mt-1"
+            />
+          ) : (
+            <div className="text-xs text-green-400 mt-1">online</div>
           )}
         </div>
         

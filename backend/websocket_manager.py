@@ -135,6 +135,10 @@ class WebSocketManager:
                 await self._handle_add_reaction(ghost_id, data)
             elif message_type == "remove_reaction":
                 await self._handle_remove_reaction(ghost_id, data)
+            elif message_type == "mark_read":
+                await self._handle_mark_read(ghost_id, data)
+            elif message_type == "update_last_seen":
+                await self._handle_update_last_seen(ghost_id, data)
             else:
                 logger.warning(f"Unknown message type: {message_type}")
                 
@@ -256,13 +260,33 @@ class WebSocketManager:
         if not sender_display:
             sender_display = self.ghost_manager.get_display_name(ghost_id)
         
+        # Broadcast to room members and mark as delivered
+        room_members = await self.redis_manager.get_room_members(room_id)
+        message_with_display = {
+            **message,
+            "sender_display": sender_display
+        }
+        
         await self._broadcast_to_room(room_id, {
             "type": "new_message",
-            "message": {
-                **message,
-                "sender_display": sender_display
-            }
+            "message": message_with_display
         })
+        
+        # Mark message as delivered to all connected room members
+        delivered_to = []
+        for member_id in room_members:
+            if member_id != ghost_id and member_id in self.active_connections:
+                if await self.redis_manager.mark_message_delivered(message["id"], room_id, member_id):
+                    delivered_to.append(member_id)
+        
+        # Send delivery confirmation to sender if any deliveries occurred
+        if delivered_to:
+            await self._send_personal_message(ghost_id, {
+                "type": "message_status_update",
+                "message_id": message["id"],
+                "status": "delivered",
+                "delivered_to_count": len(delivered_to)
+            })
 
     async def _handle_create_room(self, ghost_id: str, data: Dict):
         room_name = data.get("room_name")
@@ -438,3 +462,60 @@ class WebSocketManager:
         except Exception as e:
             logger.error(f"Error removing reaction: {e}")
             await self._send_error(ghost_id, "Failed to remove reaction")
+
+    async def _handle_mark_read(self, ghost_id: str, data: Dict):
+        """Handle marking messages as read"""
+        message_ids = data.get("message_ids", [])
+        room_id = data.get("room_id")
+        
+        if not room_id:
+            await self._send_error(ghost_id, "room_id is required")
+            return
+        
+        # Verify user is in the room
+        if room_id not in self.ghost_rooms.get(ghost_id, set()):
+            await self._send_error(ghost_id, "You are not in this room")
+            return
+        
+        read_count = 0
+        sender_notifications = {}  # {sender_id: [message_ids]}
+        
+        for message_id in message_ids:
+            if await self.redis_manager.mark_message_read(message_id, room_id, ghost_id):
+                read_count += 1
+                
+                # Get message to find sender for read receipt
+                message_key = f"messages:{room_id}:{message_id}"
+                message_data_str = await self.redis_manager.redis.get(message_key)
+                if message_data_str:
+                    message_data = json.loads(message_data_str)
+                    sender_id = message_data.get('sender')
+                    if sender_id and sender_id != ghost_id:
+                        if sender_id not in sender_notifications:
+                            sender_notifications[sender_id] = []
+                        sender_notifications[sender_id].append(message_id)
+        
+        # Update last seen timestamp
+        await self.redis_manager.update_user_last_seen(ghost_id, room_id)
+        
+        # Send read receipts to message senders
+        for sender_id, read_message_ids in sender_notifications.items():
+            if sender_id in self.active_connections:
+                await self._send_personal_message(sender_id, {
+                    "type": "message_status_update",
+                    "message_ids": read_message_ids,
+                    "status": "read",
+                    "read_by": ghost_id,
+                    "room_id": room_id
+                })
+        
+        logger.info(f"Ghost {ghost_id} marked {read_count} messages as read in room {room_id}")
+
+    async def _handle_update_last_seen(self, ghost_id: str, data: Dict):
+        """Handle updating user's last seen timestamp"""
+        room_id = data.get("room_id")
+        
+        # Update global last seen
+        await self.redis_manager.update_user_last_seen(ghost_id, room_id)
+        
+        logger.debug(f"Updated last seen for ghost {ghost_id} in room {room_id}")
