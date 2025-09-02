@@ -15,6 +15,13 @@ export interface GhostIdentity {
   session_ttl: number;
 }
 
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  reactors: string[];
+  displayNames: string[];
+}
+
 export interface Message {
   id: string;
   sender: string;
@@ -22,6 +29,7 @@ export interface Message {
   content: string;
   room_id: string;
   timestamp: string;
+  reactions?: { [emoji: string]: MessageReaction };
 }
 
 export interface Room {
@@ -41,7 +49,7 @@ export interface Room {
 export interface WebSocketMessage {
   type: 'connection_established' | 'room_joined' | 'room_left' | 'new_message' | 
         'ghost_joined' | 'ghost_left' | 'room_created' | 'room_list' | 'error' |
-        'heartbeat' | 'pong' | 'typing_indicator' | 'stats_update';
+        'heartbeat' | 'pong' | 'typing_indicator' | 'stats_update' | 'message_reaction';
   [key: string]: any;
 }
 

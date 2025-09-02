@@ -65,6 +65,7 @@ class DestructionEngine:
             
             await self._cleanup_orphaned_rooms()
             await self._cleanup_empty_sets()
+            await self._cleanup_orphaned_reactions()
             
             logger.info("Cleanup cycle completed")
             
@@ -100,6 +101,50 @@ class DestructionEngine:
                         continue
                         
                 await self.redis_manager.delete_room(room_id)
+
+    async def _cleanup_orphaned_reactions(self) -> None:
+        """Clean up reactions for messages that no longer exist"""
+        try:
+            # Get all reaction keys
+            reaction_keys = await self.redis_manager.redis.keys("reactions:*")
+            display_keys = await self.redis_manager.redis.keys("reaction_names:*")
+            
+            orphaned_reactions = 0
+            orphaned_displays = 0
+            
+            # Clean up reaction keys
+            for key in reaction_keys:
+                # Extract message ID from key: reactions:message_id:emoji
+                parts = key.split(':')
+                if len(parts) >= 2:
+                    message_id = parts[1]
+                    
+                    # Check if the message still exists
+                    message_keys = await self.redis_manager.redis.keys(f"messages:*:{message_id}")
+                    if not message_keys:
+                        # Message doesn't exist, remove the reaction
+                        await self.redis_manager.redis.delete(key)
+                        orphaned_reactions += 1
+            
+            # Clean up display name keys
+            for key in display_keys:
+                # Extract message ID from key: reaction_names:message_id:emoji
+                parts = key.split(':')
+                if len(parts) >= 2:
+                    message_id = parts[1]
+                    
+                    # Check if the message still exists
+                    message_keys = await self.redis_manager.redis.keys(f"messages:*:{message_id}")
+                    if not message_keys:
+                        # Message doesn't exist, remove the display names
+                        await self.redis_manager.redis.delete(key)
+                        orphaned_displays += 1
+            
+            if orphaned_reactions > 0 or orphaned_displays > 0:
+                logger.info(f"Cleaned up {orphaned_reactions} orphaned reactions and {orphaned_displays} display mappings")
+                
+        except Exception as e:
+            logger.error(f"Error cleaning up orphaned reactions: {e}")
 
     async def get_destruction_report(self) -> dict:
         try:

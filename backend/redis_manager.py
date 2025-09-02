@@ -20,6 +20,7 @@ class RedisManager:
         self.ROOM_TTL = 604800      # 7 days for persistent rooms (24x7)
         self.PUBLIC_ROOM_TTL = -1   # Never expire for public rooms
         self.ACTIVE_USERS_TTL = 86400  # 24 hours
+        self.REACTION_TTL = 86400   # 24 hours - same as messages
 
     async def connect(self):
         try:
@@ -114,7 +115,14 @@ class RedisManager:
         for key in message_keys:
             message_data_str = await self.redis.get(key)
             if message_data_str:
-                messages.append(json.loads(message_data_str))
+                message_data = json.loads(message_data_str)
+                
+                # Add reactions to message
+                reactions = await self.get_message_reactions(message_data['id'])
+                if reactions:
+                    message_data['reactions'] = reactions
+                
+                messages.append(message_data)
         
         return messages
 
@@ -299,6 +307,16 @@ class RedisManager:
     async def delete_ghost_data(self, ghost_id: str) -> None:
         pipeline = self.redis.pipeline()
         
+        # First, remove user from all reaction sets
+        reaction_keys = await self.redis.keys("reactions:*")
+        for key in reaction_keys:
+            pipeline.srem(key, ghost_id)
+        
+        # Remove user from reaction display mappings
+        display_keys = await self.redis.keys("reaction_names:*")
+        for key in display_keys:
+            pipeline.hdel(key, ghost_id)
+        
         ghost_keys = await self.redis.keys(f"*{ghost_id}*")
         if ghost_keys:
             pipeline.delete(*ghost_keys)
@@ -310,7 +328,7 @@ class RedisManager:
             pipeline.srem(f"room_members:{room_id}", ghost_id)
         
         await pipeline.execute()
-        logger.info(f"All data for ghost {ghost_id} deleted")
+        logger.info(f"All data for ghost {ghost_id} deleted including reactions")
 
     async def get_active_ghost_count(self) -> int:
         return await self.redis.scard("active_users")
@@ -328,6 +346,11 @@ class RedisManager:
             if message_data_str:
                 message_data = json.loads(message_data_str)
                 if message_data.get('sender') == ghost_id:
+                    # Delete the message and its reactions
+                    message_id = message_data.get('id')
+                    if message_id:
+                        await self.delete_message_reactions(message_id)
+                    
                     await self.redis.delete(message_key)
                     await self.redis.lrem(f"room_messages:{room_id}", 1, message_key)
                     deleted_count += 1
@@ -389,3 +412,108 @@ class RedisManager:
                 await self.redis.srem("all_rooms", room_id)
         
         logger.info("Completed Redis cleanup")
+
+    # Message Reaction Methods
+    async def add_message_reaction(self, message_id: str, ghost_id: str, emoji: str) -> Dict:
+        """Add a reaction to a message"""
+        reaction_key = f"reactions:{message_id}:{emoji}"
+        
+        # Add the ghost to the reaction set
+        await self.redis.sadd(reaction_key, ghost_id)
+        await self.redis.expire(reaction_key, self.REACTION_TTL)
+        
+        # Get user's display name
+        session = await self.get_ghost_session(ghost_id)
+        display_name = session.get('custom_name') if session else f"Ghost#{ghost_id[-4:]}"
+        
+        # Store display name mapping for this reaction
+        display_key = f"reaction_names:{message_id}:{emoji}"
+        await self.redis.hset(display_key, ghost_id, display_name)
+        await self.redis.expire(display_key, self.REACTION_TTL)
+        
+        # Get updated reaction data
+        reaction_data = await self.get_message_reactions(message_id)
+        logger.info(f"Ghost {ghost_id} added reaction {emoji} to message {message_id}")
+        
+        return reaction_data
+
+    async def remove_message_reaction(self, message_id: str, ghost_id: str, emoji: str) -> Dict:
+        """Remove a reaction from a message"""
+        reaction_key = f"reactions:{message_id}:{emoji}"
+        display_key = f"reaction_names:{message_id}:{emoji}"
+        
+        # Remove the ghost from the reaction set
+        await self.redis.srem(reaction_key, ghost_id)
+        await self.redis.hdel(display_key, ghost_id)
+        
+        # Clean up empty reaction sets
+        count = await self.redis.scard(reaction_key)
+        if count == 0:
+            await self.redis.delete(reaction_key)
+            await self.redis.delete(display_key)
+        
+        # Get updated reaction data
+        reaction_data = await self.get_message_reactions(message_id)
+        logger.info(f"Ghost {ghost_id} removed reaction {emoji} from message {message_id}")
+        
+        return reaction_data
+
+    async def get_message_reactions(self, message_id: str) -> Dict:
+        """Get all reactions for a message"""
+        # Find all reaction keys for this message
+        reaction_keys = await self.redis.keys(f"reactions:{message_id}:*")
+        reactions = {}
+        
+        for key in reaction_keys:
+            # Extract emoji from key: reactions:message_id:emoji
+            emoji = key.split(':')[-1]
+            
+            # Get reactors
+            reactors = await self.redis.smembers(key)
+            if not reactors:
+                continue
+                
+            # Get display names
+            display_key = f"reaction_names:{message_id}:{emoji}"
+            display_names = []
+            for reactor in reactors:
+                display_name = await self.redis.hget(display_key, reactor)
+                display_names.append(display_name or f"Ghost#{reactor[-4:]}")
+            
+            reactions[emoji] = {
+                "emoji": emoji,
+                "count": len(reactors),
+                "reactors": list(reactors),
+                "displayNames": display_names
+            }
+        
+        return reactions
+
+    async def delete_message_reactions(self, message_id: str) -> None:
+        """Delete all reactions for a message (used when message is deleted)"""
+        reaction_keys = await self.redis.keys(f"reactions:{message_id}:*")
+        display_keys = await self.redis.keys(f"reaction_names:{message_id}:*")
+        
+        if reaction_keys:
+            await self.redis.delete(*reaction_keys)
+        if display_keys:
+            await self.redis.delete(*display_keys)
+        
+        logger.info(f"Deleted all reactions for message {message_id}")
+
+    async def get_user_reactions_in_room(self, ghost_id: str, room_id: str) -> List[str]:
+        """Get all message IDs that a user has reacted to in a room"""
+        # This is a helper method for cleanup - get messages in room first
+        message_keys = await self.redis.lrange(f"room_messages:{room_id}", 0, -1)
+        user_reacted_messages = []
+        
+        for message_key in message_keys:
+            message_id = message_key.split(':')[-1]  # Extract message ID
+            reaction_keys = await self.redis.keys(f"reactions:{message_id}:*")
+            
+            for key in reaction_keys:
+                if await self.redis.sismember(key, ghost_id):
+                    user_reacted_messages.append(message_id)
+                    break  # User has reacted to this message
+        
+        return user_reacted_messages

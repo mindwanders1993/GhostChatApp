@@ -7,6 +7,10 @@ import { DestructionTimer } from '../components/DestructionTimer';
 import { SelfDestructButton } from '../components/SelfDestructButton';
 import { UserCard } from '../components/UserCard';
 import { PrivateConversationsList } from '../components/PrivateConversationsList';
+import { MessageReactions } from '../components/MessageReactions';
+import { ReactionPicker } from '../components/ReactionPicker';
+import { SmartRichTextInput } from '../components/SmartRichTextInput';
+import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { Message, Room } from '../types';
 
 export const Chat: React.FC = () => {
@@ -34,6 +38,7 @@ export const Chat: React.FC = () => {
   const [userMessageCount, setUserMessageCount] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [rightSidebarView, setRightSidebarView] = useState<'users' | 'private'>('users');
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const processedRoomRef = useRef<string | null>(null);
@@ -200,6 +205,27 @@ export const Chat: React.FC = () => {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  // Reaction handlers
+  const handleAddReaction = (messageId: string, emoji: string) => {
+    if (currentRoom) {
+      webSocket.addReaction(messageId, emoji, currentRoom);
+    }
+  };
+
+  const handleRemoveReaction = (messageId: string, emoji: string) => {
+    if (currentRoom) {
+      webSocket.removeReaction(messageId, emoji, currentRoom);
+    }
+  };
+
+  const handleShowReactionPicker = (messageId: string) => {
+    setShowReactionPicker(messageId);
+  };
+
+  const handleCloseReactionPicker = () => {
+    setShowReactionPicker(null);
   };
 
   const formatMessageTime = (timestamp: string) => {
@@ -439,26 +465,63 @@ export const Chat: React.FC = () => {
                             {message.sender_display || `Ghost#${message.sender.slice(-4)}`}
                           </div>
                         )}
-                        <div
-                          className={`
-                            max-w-xs lg:max-w-md px-3 py-2 rounded-2xl relative
-                            ${isOwn 
-                              ? 'bg-blue-500 text-white rounded-br-md' 
-                              : 'bg-gray-700 text-white rounded-bl-md'
-                            }
-                            shadow-sm
-                          `}
-                        >
-                          <div className="select-text break-words">{message.content}</div>
-                          <div className={`
-                            text-xs mt-1 
-                            ${isOwn ? 'text-blue-100' : 'text-gray-400'}
-                            float-right ml-2
-                          `}>
-                            {formatMessageTime(message.timestamp)}
-                            {isOwn && <span className="ml-1">✓</span>}
+                        <div className="relative">
+                          <div
+                            className={`
+                              max-w-xs lg:max-w-md px-3 py-2 rounded-2xl relative group
+                              ${isOwn 
+                                ? 'bg-blue-500 text-white rounded-br-md' 
+                                : 'bg-gray-700 text-white rounded-bl-md'
+                              }
+                              shadow-sm
+                            `}
+                          >
+                            <MarkdownRenderer content={message.content} />
+                            <div className={`
+                              text-xs mt-1 
+                              ${isOwn ? 'text-blue-100' : 'text-gray-400'}
+                              float-right ml-2
+                            `}>
+                              {formatMessageTime(message.timestamp)}
+                              {isOwn && <span className="ml-1">✓</span>}
+                            </div>
+                            <div className="clear-both"></div>
+                            
+                            {/* Reaction button - shows on hover */}
+                            <button
+                              onClick={() => handleShowReactionPicker(message.id)}
+                              className="
+                                absolute -bottom-2 -right-2 w-6 h-6 
+                                bg-gray-600 hover:bg-gray-500 rounded-full
+                                flex items-center justify-center text-xs
+                                opacity-0 group-hover:opacity-100 transition-opacity
+                                border border-gray-500
+                              "
+                              title="Add reaction"
+                            >
+                              😊
+                            </button>
                           </div>
-                          <div className="clear-both"></div>
+                          
+                          {/* Reaction picker */}
+                          {showReactionPicker === message.id && (
+                            <ReactionPicker
+                              onSelectEmoji={(emoji) => handleAddReaction(message.id, emoji)}
+                              onClose={handleCloseReactionPicker}
+                              position="above"
+                            />
+                          )}
+                          
+                          {/* Message reactions */}
+                          {message.reactions && (
+                            <MessageReactions
+                              reactions={message.reactions}
+                              onAddReaction={(emoji) => handleAddReaction(message.id, emoji)}
+                              onRemoveReaction={(emoji) => handleRemoveReaction(message.id, emoji)}
+                              currentUserId={ghost.ghost_id}
+                              className={isOwn ? 'justify-end' : 'justify-start'}
+                            />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -492,40 +555,25 @@ export const Chat: React.FC = () => {
 
             {/* Message Input */}
             <div className="bg-gray-800 border-t border-gray-700 p-4">
-              <form onSubmit={handleSendMessage} className="flex items-end space-x-3">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
+              <div className="flex items-end space-x-3">
+                <div className="flex-1">
+                  <SmartRichTextInput
                     value={messageInput}
-                    onChange={(e) => {
-                      setMessageInput(e.target.value);
+                    onChange={(value) => {
+                      setMessageInput(value);
                       handleTypingStart();
+                    }}
+                    onSubmit={() => {
+                      const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                      handleSendMessage(fakeEvent);
                     }}
                     placeholder={isConnected ? "Type a message..." : "Connecting..."}
                     disabled={!isConnected}
-                    className="
-                      w-full 
-                      px-4 
-                      py-3 
-                      bg-gray-700 
-                      text-white 
-                      rounded-3xl 
-                      border 
-                      border-gray-600 
-                      focus:border-blue-500 
-                      focus:outline-none
-                      disabled:opacity-50
-                      select-text
-                      resize-none
-                    "
-                    maxLength={1000}
+                    maxLength={2000}
                   />
-                  <div className="absolute bottom-1 right-3 text-xs text-gray-500">
-                    {messageInput.length > 800 && `${messageInput.length}/1000`}
-                  </div>
                 </div>
                 <button
-                  type="submit"
+                  onClick={handleSendMessage}
                   disabled={!messageInput.trim() || !isConnected}
                   className={`
                     w-12 
@@ -547,7 +595,7 @@ export const Chat: React.FC = () => {
                     <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
                   </svg>
                 </button>
-              </form>
+              </div>
             </div>
           </>
         )}
